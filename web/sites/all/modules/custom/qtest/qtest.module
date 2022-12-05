@@ -1,0 +1,65 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function qtest_menu() {
+  $items['q-autocomplete-form'] = [
+    'title' => 'Test autocomplete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => ['qtest_form'],
+    'access arguments' => ['access content'],
+    'type' => MENU_NORMAL_ITEM,
+  ];
+  $items['q-autocomplete-callback'] = [
+    'page callback' => 'qtest_autocomplete',
+    'access arguments' => ['access content'],
+    'type' => MENU_CALLBACK,
+  ];
+  return $items;
+}
+
+function qtest_form($form, &$form_state) {
+  $form = [];
+
+  $form['users'] = array(
+    '#title' => t('Search for users'),
+    '#description' => t("Type in some user data to search for..."),
+    '#type' => 'textfield',
+    '#maxlength' => 60,
+    '#autocomplete_path' => 'q-autocomplete-callback',
+  );
+
+  return $form;
+}
+
+/**
+ * Searches for user data.
+ *
+ * @param string $input
+ * @return void
+ */
+function qtest_autocomplete($input) {
+  $results = [];
+  $input = check_plain(strtolower($input));
+
+  if (strlen($input) > 1) {
+    $sql = "SELECT uid, SUM(score) AS total_score FROM {playground.demo_users_index} ";
+    $sql .= "WHERE MATCH (token) AGAINST (:input IN BOOLEAN MODE) ";
+    $sql .= "GROUP BY uid ";
+    $sql .= "ORDER BY total_score DESC ";
+    $sql .= "LIMIT 0, 5";
+    $params = [
+      ':input' => $input . "*",
+    ];
+    $query = db_query($sql, $params);
+    foreach ($query->fetchAll() as $row) {
+      $user_query = db_query("SELECT pv.value AS fullname FROM {playground.demo_profile_values} pv WHERE pv.uid = :uid AND fid = :fid", [':uid' => $row->uid, ':fid' => 3]);
+      $user = $user_query->fetchAssoc();
+      $val = $user['fullname'];
+      $results[$val] = $val;
+    }
+  }
+
+  drupal_json_output($results);
+}
