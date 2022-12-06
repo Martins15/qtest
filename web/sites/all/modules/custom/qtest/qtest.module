@@ -44,11 +44,18 @@ function qtest_autocomplete($input) {
   $input = check_plain(strtolower($input));
 
   if (strlen($input) > 1) {
-    $sql = "SELECT uid, SUM(score) AS total_score FROM {playground.demo_users_index} ";
+    $sql = "SELECT uid, SUM((CASE ";
+    $sql .= "WHEN field_name = 'mail' then 2 ";
+    $sql .= "WHEN field_name = 'fullname' then 4 ";
+    $sql .= "WHEN field_name = 'username' then 1 ";
+    $sql .= "END)) AS total_boost, ";
+    $sql .= "SUM(MATCH (token) AGAINST (:input IN BOOLEAN MODE)) AS total_score ";
+    $sql .= "FROM {playground.demo_users_index} ";
     $sql .= "WHERE MATCH (token) AGAINST (:input IN BOOLEAN MODE) ";
     $sql .= "GROUP BY uid ";
-    $sql .= "ORDER BY total_score DESC ";
+    $sql .= "ORDER BY total_boost, total_score DESC ";
     $sql .= "LIMIT 0, 5";
+
     $params = [
       ':input' => $input . "*",
     ];
